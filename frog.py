@@ -60,6 +60,18 @@ class FrogIterKey:
         self.SubstPermu = origin.SubstPermu
         self.BombPermu = origin.BombPermu
 
+class FrogInternalKey:
+    def __init__(self):
+        self.internalKey = [FrogIterKey() for i in range(NUM_ITERATIONS)]
+        self.keyE=[FrogIterKey() for i in range(NUM_ITERATIONS)]
+        self.keyD=[FrogIterKey() for i in range(NUM_ITERATIONS)]
+
+    def setValue(self,index,value):
+        self.internalKey[index/FrogIterKey.size()].setValue(index%FrogIterKey.size(),value)
+    
+    def getValue(self,index):
+        return self.internalKey[index/FrogIterKey.size()].getValue(index%FrogIterKey.size())
+
 
 
 def frogEncrypt(plainText, key):
@@ -219,6 +231,13 @@ def invertPermutation(origPermu):
         invPermu[origPermu[i]] = i
     return invPermu
 
+def makeKey(k):
+    intKey = FrogInternalKey()
+    intKey.internalKey = hashKey(k)
+    intKey.keyE=makeInternalKey(ENCRYPTION.ENCRYPT, intKey.internalKey)
+    intKey.keyD=makeInternalKey(ENCRYPTION.DECRYPT, intKey.internalKey)
+    sessionkey=intKey
+    
 def main():
     pass
 
