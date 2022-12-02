@@ -151,12 +151,12 @@ def makeInternalKey(decrypting, keyorigin):
 
 def hashKey(binaryKey):
     buffer = np.empty(BLOCK_SIZE, dtype=np.int8)
-    simpleKey = FrogIterKey[NUM_ITERATIONS]
-    internalKey= FrogIterKey[NUM_ITERATIONS]
+    simpleKey = [FrogIterKey() for i in range(NUM_ITERATIONS)]
+    internalKey= [FrogIterKey() for i in range(NUM_ITERATIONS)]
     for i in range(0, NUM_ITERATIONS):
         simpleKey[i]=FrogIterKey()
         internalKey[i]=FrogIterKey()
-    keyLen=binaryKey.length
+    keyLen=len(binaryKey)
     sizeKey=FrogIterKey.size() * NUM_ITERATIONS
     iSeed=0
     iFrase=0
@@ -237,9 +237,15 @@ def makeKey(k):
     intKey.keyE=makeInternalKey(ENCRYPTION.ENCRYPT, intKey.internalKey)
     intKey.keyD=makeInternalKey(ENCRYPTION.DECRYPT, intKey.internalKey)
     sessionkey=intKey
+    return intKey
     
 def main():
-    pass
+    k = np.empty(32, dtype=np.int8)
+    for i in range(0, 32):
+        k[i] = 0
+    intKey=makeKey(k)
+    print(intKey.keyE)
+    print(intKey.keyD)
 
 if __name__ == "__main__":
     main()
