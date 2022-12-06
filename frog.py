@@ -240,7 +240,6 @@ def makeKey(k):
     intKey.internalKey = hashKey(k)
     intKey.keyE=makeInternalKey(ENCRYPTION.ENCRYPT, intKey.internalKey)
     intKey.keyD=makeInternalKey(ENCRYPTION.DECRYPT, intKey.internalKey)
-    sessionkey=intKey
     return intKey
     
 def main():
