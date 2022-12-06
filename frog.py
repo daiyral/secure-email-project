@@ -2,10 +2,9 @@
 import numpy as np
 from enum import Enum
 
-BLOCK_SIZE = 16
+BLOCK_SIZE = 10
 
 NUM_ITERATIONS = 8
-
 
 randomSeed=[
     113, 21,232, 18,113, 92, 63,157,124,193,166,197,126, 56,229,229,
@@ -74,181 +73,189 @@ class FrogInternalKey:
     
     def getValue(self,index):
         return self.internalKey[index/FrogIterKey.size()].getValue(index%FrogIterKey.size())
-
-
-
-def frogEncrypt(plainText, key):
-    #Encrypt plainText using internalKey - (internal cycle) See B.1.1
-    for i in range (0, NUM_ITERATIONS):
-        for j in range (0, BLOCK_SIZE):
-            plainText[j] = plainText[j] ^ key[i].xorBu[j]
-            if plainText[j]<0:
-                plainText[j] = key[i].SubstPermu[plainText[j]+256]
-            else:
-                plainText[j] = key[i].SubstPermu[plainText[j]]
-            if j< BLOCK_SIZE -1:
-                plainText[j+1]= plainText[j+1] ^ plainText[j]
-            else:
-                plainText[0] = plainText[0] ^ plainText[BLOCK_SIZE-1]
-            plainText[key[i].BombPermu[j]] ^= plainText[j] 
-    return plainText
+class Frog:
+    def __init__(self):
+        pass
     
-def frogDecrypt(cipherText, key):
-    for i in reversed(range (0, NUM_ITERATIONS)):
-        for j in reversed(range (0, BLOCK_SIZE)):
-            cipherText[key[i]].BombPermu[j] ^= cipherText[j]
-            if(j< BLOCK_SIZE -1):
-                cipherText[j+1] = cipherText[j+1] ^ cipherText[j]
-            else:
-                cipherText[0] = cipherText[0] ^ cipherText[BLOCK_SIZE-1]
-            if cipherText[j]<0:
-                cipherText[j] = key[i].SubstPermu[cipherText[j]+256]
-            else:
-                cipherText[j] = key[i].SubstPermu[cipherText[j]]
-            cipherText[j] = cipherText[j] ^ key[i].xorBu[j]
-    return cipherText
-
-def makeInternalKey(decrypting, keyorigin):
-    used = np.empty(BLOCK_SIZE, dtype=np.int8)
-    key= [FrogIterKey() for i in range(NUM_ITERATIONS)]
-    k=0
-    l=0
-    for i in range(0, NUM_ITERATIONS):
-        key[i]=FrogIterKey()
-        key[i].copyFrom(keyorigin[i])
-    for i in range (0, NUM_ITERATIONS):
-        key[i].SubstPermu=makePermutation(key[i].SubstPermu)
-        if(decrypting.value):
-            key[i].SubstPermu=invertPermutation(key[i].SubstPermu)
-        
-        key[i].BombPermu=makePermutation(key[i].BombPermu)
-        for j in range (0, BLOCK_SIZE):
-            used[j]=0
-        for j in range (0, BLOCK_SIZE-1):
-            if(key[i].BombPermu[j] == 0):
-                k=j
-                while True:
-                    k =(k+1) % BLOCK_SIZE
-                    if used[k] == 0:
-                        break
-                key[i].BombPermu[j] = k
-                l=k
-                while key[i].BombPermu[l] !=k:
-                    l=key[i].BombPermu[l]
-                key[i].BombPermu[l]=0
-            used[j]=1
-            j=key[i].BombPermu[j]
-        for ind in range (0, BLOCK_SIZE):
-            if ind == BLOCK_SIZE -1:
-                j=0
-            else:
-                j=ind+1
-            if key[i].BombPermu[ind]==j:
-                if(j == BLOCK_SIZE -1):
-                    k=0
+    def frogEncrypt(self, plainText, key):
+        #Encrypt plainText using internalKey - (internal cycle) See B.1.1
+        for i in range (NUM_ITERATIONS):
+            for j in range (BLOCK_SIZE):
+                plainText[j] = np.bitwise_xor(plainText[j], key[i].xorBu[j]) 
+                if plainText[j]<0:
+                    plainText[j] = key[i].SubstPermu[plainText[j]+256]
                 else:
-                    k=j+1
-                key[i].BombPermu[ind]=k
+                    plainText[j] = key[i].SubstPermu[plainText[j]]
+                if j< BLOCK_SIZE -1:
+                    plainText[j+1]= plainText[j+1] ^ plainText[j]
+                else:
+                    plainText[0] = plainText[0] ^ plainText[BLOCK_SIZE-1]
+                plainText[key[i].BombPermu[j]] ^= plainText[j] 
+        return plainText
         
-    return key
+    def frogDecrypt(self, cipherText, key):
+        for i in reversed(range (0, NUM_ITERATIONS)):
+            for j in reversed(range (0, BLOCK_SIZE)):
+                cipherText[key[i]].BombPermu[j] ^= cipherText[j]
+                if(j< BLOCK_SIZE -1):
+                    cipherText[j+1] = cipherText[j+1] ^ cipherText[j]
+                else:
+                    cipherText[0] = cipherText[0] ^ cipherText[BLOCK_SIZE-1]
+                if cipherText[j]<0:
+                    cipherText[j] = key[i].SubstPermu[cipherText[j]+256]
+                else:
+                    cipherText[j] = key[i].SubstPermu[cipherText[j]]
+                cipherText[j] = cipherText[j] ^ key[i].xorBu[j]
+        return cipherText
 
-def hashKey(binaryKey):
-    buffer = np.empty(BLOCK_SIZE, dtype=np.int8)
-    simpleKey = [FrogIterKey() for i in range(NUM_ITERATIONS)]
-    internalKey= [FrogIterKey() for i in range(NUM_ITERATIONS)]
-    for i in range(0, NUM_ITERATIONS):
-        simpleKey[i]=FrogIterKey()
-        internalKey[i]=FrogIterKey()
-    keyLen=len(binaryKey)
-    sizeKey=FrogIterKey.size() * NUM_ITERATIONS
-    iSeed=0
-    iFrase=0
-    for i in range(0, sizeKey):
-        simpleKey[i//FrogIterKey.size()].setValue(i%FrogIterKey.size(), randomSeed[iSeed]^binaryKey[iFrase])
-        if iSeed<250:
-            iSeed=iSeed+1
-        else:
-            iSeed=0
-        if iFrase<keyLen-1:
-            iFrase=iFrase+1
-        else:
-            iFrase=0
-    simpleKey=makeInternalKey(ENCRYPTION.ENCRYPT, simpleKey)
-    for i in range(0, BLOCK_SIZE):
-        buffer[i]=0
-    last = keyLen-1
-    if(last>BLOCK_SIZE):
-        last=BLOCK_SIZE-1
-    for i in range(0, last+1):
-        buffer[i] ^= binaryKey[i]
-    buffer[0] ^= keyLen
+    def makeInternalKey(self, decrypting, keyorigin):
+        used = np.empty(BLOCK_SIZE, dtype=np.int8)
+        key= [FrogIterKey() for i in range(NUM_ITERATIONS)]
+        k=0
+        l=0
+        for i in range(0, NUM_ITERATIONS):
+            key[i]=FrogIterKey()
+            key[i].copyFrom(keyorigin[i])
+        for i in range (0, NUM_ITERATIONS):
+            key[i].SubstPermu=self.makePermutation(key[i].SubstPermu)
+            if(decrypting.value):
+                key[i].SubstPermu=self.invertPermutation(key[i].SubstPermu)
+            
+            key[i].BombPermu=self.makePermutation(key[i].BombPermu)
+            for j in range (0, BLOCK_SIZE):
+                used[j]=0
+            for j in range (0, BLOCK_SIZE-1):
+                if(key[i].BombPermu[j] == 0):
+                    k=j
+                    while True:
+                        k =(k+1) % BLOCK_SIZE
+                        if used[k] == 0:
+                            break
+                    key[i].BombPermu[j] = k
+                    l=k
+                    while key[i].BombPermu[l] !=k:
+                        l=key[i].BombPermu[l]
+                    key[i].BombPermu[l]=0
+                used[j]=1
+                j=key[i].BombPermu[j]
+            for ind in range (0, BLOCK_SIZE):
+                if ind == BLOCK_SIZE -1:
+                    j=0
+                else:
+                    j=ind+1
+                if key[i].BombPermu[ind]==j:
+                    if(j == BLOCK_SIZE -1):
+                        k=0
+                    else:
+                        k=j+1
+                    key[i].BombPermu[ind]=k
+            
+        return key
 
-    position=0
-
-    while True:
-        buffer= frogEncrypt(buffer, simpleKey)
-        size =sizeKey-position
-        if(size> BLOCK_SIZE):
-            size=BLOCK_SIZE
-        for i in range (0, BLOCK_SIZE):
-            if(buffer[i]<0):
-                internalKey[(position+i)//FrogIterKey.size()].setValue((position+i)%FrogIterKey.size(), buffer[i]+256)
+    def hashKey(self, binaryKey):
+        buffer = np.empty(BLOCK_SIZE, dtype=np.int8)
+        simpleKey = [FrogIterKey() for i in range(NUM_ITERATIONS)]
+        internalKey= [FrogIterKey() for i in range(NUM_ITERATIONS)]
+        for i in range(0, NUM_ITERATIONS):
+            simpleKey[i]=FrogIterKey()
+            internalKey[i]=FrogIterKey()
+        keyLen=len(binaryKey)
+        sizeKey=FrogIterKey.size() * NUM_ITERATIONS
+        iSeed=0
+        iFrase=0
+        for i in range(0, sizeKey):
+            simpleKey[i//FrogIterKey.size()].setValue(i%FrogIterKey.size(), randomSeed[iSeed]^binaryKey[iFrase])
+            if iSeed<250:
+                iSeed=iSeed+1
             else:
-                internalKey[(position+i)//FrogIterKey.size()].setValue((position+i)%FrogIterKey.size(), buffer[i])
-        position = position + size
-        if position == sizeKey:
-            break
-    return internalKey
+                iSeed=0
+            if iFrase<keyLen-1:
+                iFrase=iFrase+1
+            else:
+                iFrase=0
+        simpleKey=self.makeInternalKey(ENCRYPTION.ENCRYPT, simpleKey)
+        for i in range(0, BLOCK_SIZE):
+            buffer[i]=0
+        last = keyLen-1
+        if(last>BLOCK_SIZE):
+            last=BLOCK_SIZE-1
+        for i in range(0, last+1):
+            buffer[i] ^= binaryKey[i]
+        buffer[0] ^= keyLen
 
+        position=0
 
+        while True:
+            buffer = self.frogEncrypt(buffer, simpleKey)
+            size = sizeKey-position
+            if(size > BLOCK_SIZE):
+                size=BLOCK_SIZE
+            for i in range (BLOCK_SIZE):
+                if buffer[i]<0:
+                    internalKey[(position+i)//FrogIterKey.size()].setValue((position+i)%FrogIterKey.size(), buffer[i]+256)
+                else:
+                    internalKey[(position+i)//FrogIterKey.size()].setValue((position+i)%FrogIterKey.size(), buffer[i])
+            position = position + size
+            if position == sizeKey:
+                break
+        return internalKey
 
-def makePermutation( permu):
+    def makePermutation(self, permu):
 
-    #Receives an arbitarty byte arror of (lastElem -1) elements and
-    #returns a permutation with values between 0 and lastElem.
-	#Reference Text: section B.1.3  
-    use = np.empty(256, dtype=np.int8) # 256 length byte array
-    lastElem = len(permu) -1
-    last = lastElem
-    j=0
-    #initialize use array
-    for i in range(0, lastElem+1):
-        use[i]=i
-    
-    for i in range(0, lastElem):
-        j = (j+permu[i]) % (last + 1)
-        permu[i] = use[j]
-        # Remove use[index] value from use array 
-        if j<last:
-            for k in range(j, last):
-                use[k] = use[k+1]
-        last = last -1
-        if j > last:
-            j = last
-    permu[lastElem] = use[0]        
-    return permu
+        #Receives an arbitarty byte arror of (lastElem -1) elements and
+        #returns a permutation with values between 0 and lastElem.
+        #Reference Text: section B.1.3  
+        use = np.empty(256, dtype=np.int8) # 256 length byte array
+        lastElem = len(permu) -1
+        last = lastElem
+        j=0
+        #initialize use array
+        for i in range(0, lastElem+1):
+            use[i]=i
+        
+        for i in range(0, lastElem):
+            j = (j+permu[i]) % (last + 1)
+            permu[i] = use[j]
+            # Remove use[index] value from use array 
+            if j<last:
+                for k in range(j, last):
+                    use[k] = use[k+1]
+            last = last -1
+            if j > last:
+                j = last
+        permu[lastElem] = use[0]        
+        return permu
 
-def invertPermutation(origPermu):
-    #Receives a permutation and returns its inverse
-    invPermu = np.empty(256, dtype=np.int8)
-    for i in range(0, len(origPermu)):
-        invPermu[origPermu[i]] = i
-    return invPermu
+    def invertPermutation(self, origPermu):
+        #Receives a permutation and returns its inverse
+        invPermu = np.empty(256, dtype=np.int8)
+        for i in range(0, len(origPermu)):
+            invPermu[origPermu[i]] = i
+        return invPermu
 
-def makeKey(k):
-    intKey = FrogInternalKey()
-    intKey.internalKey = hashKey(k)
-    intKey.keyE=makeInternalKey(ENCRYPTION.ENCRYPT, intKey.internalKey)
-    intKey.keyD=makeInternalKey(ENCRYPTION.DECRYPT, intKey.internalKey)
-    return intKey
-    
+    def makeKey(self, k):
+        intKey = FrogInternalKey()
+        intKey.internalKey = self.hashKey(k)
+        intKey.keyE=self.makeInternalKey(ENCRYPTION.ENCRYPT, intKey.internalKey)
+        intKey.keyD=self.makeInternalKey(ENCRYPTION.DECRYPT, intKey.internalKey)
+        return intKey
+        
 def main():
-    k = np.empty(32, dtype=np.int8)
+    frog = Frog()
+    k = np.empty(32, dtype=np.int32)
     for i in range(0, 32):
-        k[i] = 0
-    intKey=makeKey(k)
+        k[i] = i
+    intKey=frog.makeKey(k)
     print(intKey.keyE)
     print(intKey.keyD)
+    userInput = "Matan".encode('utf-8').hex()
+    hex_arr = np.array([int(userInput[i:i+2], 16) for i in range(0, len(userInput), 2)])
+
+    cipherText=frog.frogEncrypt(hex_arr,intKey.keyE)
+    print("cipher Text is",cipherText)
+    plainText=frog.frogDecrypt(cipherText,intKey.keyD)
+    print("decrypted Text is",plainText)
+
 
 if __name__ == "__main__":
     main()
