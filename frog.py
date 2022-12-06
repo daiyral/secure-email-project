@@ -56,9 +56,12 @@ class FrogIterKey:
             return self.BombPermu[i-BLOCK_SIZE-256]
 
     def copyFrom(self,origin):
-        self.xorBu = origin.xorBu
-        self.SubstPermu = origin.SubstPermu
-        self.BombPermu = origin.BombPermu
+        for i in range (len(origin.xorBu)):
+            self.xorBu[i] = origin.xorBu[i]
+        for i in range (len(origin.SubstPermu)):
+            self.SubstPermu[i] = origin.SubstPermu[i]
+        for i in range (len(origin.BombPermu)):
+            self.BombPermu[i] = origin.BombPermu[i]
 
 class FrogInternalKey:
     def __init__(self):
@@ -87,13 +90,13 @@ def frogEncrypt(plainText, key):
                 plainText[j+1]= plainText[j+1] ^ plainText[j]
             else:
                 plainText[0] = plainText[0] ^ plainText[BLOCK_SIZE-1]
-            plainText[key[i].bombPermu[j]] ^= plainText[j] 
+            plainText[key[i].BombPermu[j]] ^= plainText[j] 
     return plainText
     
 def frogDecrypt(cipherText, key):
     for i in reversed(range (0, NUM_ITERATIONS)):
         for j in reversed(range (0, BLOCK_SIZE)):
-            cipherText[key[i]].bombPermu[j] ^= cipherText[j]
+            cipherText[key[i]].BombPermu[j] ^= cipherText[j]
             if(j< BLOCK_SIZE -1):
                 cipherText[j+1] = cipherText[j+1] ^ cipherText[j]
             else:
@@ -107,21 +110,21 @@ def frogDecrypt(cipherText, key):
 
 def makeInternalKey(decrypting, keyorigin):
     used = np.empty(BLOCK_SIZE, dtype=np.int8)
-    key= FrogIterKey[NUM_ITERATIONS]
+    key= [FrogIterKey() for i in range(NUM_ITERATIONS)]
     k=0
     l=0
     for i in range(0, NUM_ITERATIONS):
         key[i]=FrogIterKey()
-        key[i].copyFrom(keyorigin)
+        key[i].copyFrom(keyorigin[i])
     for i in range (0, NUM_ITERATIONS):
         key[i].SubstPermu=makePermutation(key[i].SubstPermu)
-        if(decrypting):
+        if(decrypting.value):
             key[i].SubstPermu=invertPermutation(key[i].SubstPermu)
         
         key[i].BombPermu=makePermutation(key[i].BombPermu)
         for j in range (0, BLOCK_SIZE):
             used[j]=0
-        for j in range (0, BLOCK_SIZE):
+        for j in range (0, BLOCK_SIZE-1):
             if(key[i].BombPermu[j] == 0):
                 k=j
                 while True:
@@ -130,22 +133,22 @@ def makeInternalKey(decrypting, keyorigin):
                         break
                 key[i].BombPermu[j] = k
                 l=k
-                while key[i].bombPermu[l] !=k:
-                    l=key[i].bombPermu[l]
-                key[i].bombPermu[l]=0
+                while key[i].BombPermu[l] !=k:
+                    l=key[i].BombPermu[l]
+                key[i].BombPermu[l]=0
             used[j]=1
-            j=key[i].bombPermu[j]
-        for i in range (0, BLOCK_SIZE):
-            if i == BLOCK_SIZE -1:
+            j=key[i].BombPermu[j]
+        for ind in range (0, BLOCK_SIZE):
+            if ind == BLOCK_SIZE -1:
                 j=0
             else:
-                j=i+1
-            if key[i].BombPermu[i]==j:
+                j=ind+1
+            if key[i].BombPermu[ind]==j:
                 if(j == BLOCK_SIZE -1):
                     k=0
                 else:
                     k=j+1
-                key[i].BombPermu[i]=k
+                key[i].BombPermu[ind]=k
         
     return key
 
@@ -161,7 +164,7 @@ def hashKey(binaryKey):
     iSeed=0
     iFrase=0
     for i in range(0, sizeKey):
-        simpleKey[i/FrogIterKey.size()].setValue(i%FrogIterKey.size(), randomSeed[iSeed]^binaryKey[iFrase])
+        simpleKey[i//FrogIterKey.size()].setValue(i%FrogIterKey.size(), randomSeed[iSeed]^binaryKey[iFrase])
         if iSeed<250:
             iSeed=iSeed+1
         else:
@@ -174,9 +177,9 @@ def hashKey(binaryKey):
     for i in range(0, BLOCK_SIZE):
         buffer[i]=0
     last = keyLen-1
-    if(last<BLOCK_SIZE):
+    if(last>BLOCK_SIZE):
         last=BLOCK_SIZE-1
-    for i in range(0, last):
+    for i in range(0, last+1):
         buffer[i] ^= binaryKey[i]
     buffer[0] ^= keyLen
 
@@ -189,9 +192,9 @@ def hashKey(binaryKey):
             size=BLOCK_SIZE
         for i in range (0, BLOCK_SIZE):
             if(buffer[i]<0):
-                internalKey[(position+i)/FrogIterKey.size()].setValue((position+i)%FrogIterKey.size(), buffer[i]+256)
+                internalKey[(position+i)//FrogIterKey.size()].setValue((position+i)%FrogIterKey.size(), buffer[i]+256)
             else:
-                internalKey[(position+i)/FrogIterKey.size()].setValue((position+i)%FrogIterKey.size(), buffer[i])
+                internalKey[(position+i)//FrogIterKey.size()].setValue((position+i)%FrogIterKey.size(), buffer[i])
         position = position + size
         if position == sizeKey:
             break
@@ -207,6 +210,7 @@ def makePermutation( permu):
     use = np.empty(256, dtype=np.int8) # 256 length byte array
     lastElem = len(permu) -1
     last = lastElem
+    j=0
     #initialize use array
     for i in range(0, lastElem+1):
         use[i]=i
@@ -226,8 +230,8 @@ def makePermutation( permu):
 
 def invertPermutation(origPermu):
     #Receives a permutation and returns its inverse
-    invPermu = np.empty(BLOCK_SIZE, dtype=np.int8)
-    for i in range(0, origPermu.length):
+    invPermu = np.empty(256, dtype=np.int8)
+    for i in range(0, len(origPermu)):
         invPermu[origPermu[i]] = i
     return invPermu
 
