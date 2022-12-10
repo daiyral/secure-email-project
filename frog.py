@@ -1,7 +1,8 @@
 #frog encryption decryption
 import numpy as np
 from enum import Enum
-
+import random
+import binascii
 BLOCK_SIZE = 16
 
 NUM_ITERATIONS = 8
@@ -78,7 +79,7 @@ class FrogInternalKey:
 
 
 def frogEncrypt(plainText, key):
-    #Encrypt plainText using internalKey - (internal cycle) See B.1.1
+    #Encrypt plainText using internalKey - (internal cycle) See B.1.1  
     for i in range (0, NUM_ITERATIONS):
         for j in range (0, BLOCK_SIZE):
             plainText[j] = plainText[j] ^ key[i].xorBu[j]
@@ -96,7 +97,7 @@ def frogEncrypt(plainText, key):
 def frogDecrypt(cipherText, key):
     for i in reversed(range (0, NUM_ITERATIONS)):
         for j in reversed(range (0, BLOCK_SIZE)):
-            cipherText[key[i]].BombPermu[j] ^= cipherText[j]
+            cipherText[key[i].BombPermu[j]] ^= cipherText[j]
             if(j< BLOCK_SIZE -1):
                 cipherText[j+1] = cipherText[j+1] ^ cipherText[j]
             else:
@@ -113,6 +114,7 @@ def makeInternalKey(decrypting, keyorigin):
     key= [FrogIterKey() for i in range(NUM_ITERATIONS)]
     k=0
     l=0
+    h=0
     for i in range(0, NUM_ITERATIONS):
         key[i]=FrogIterKey()
         key[i].copyFrom(keyorigin[i])
@@ -125,29 +127,29 @@ def makeInternalKey(decrypting, keyorigin):
         for j in range (0, BLOCK_SIZE):
             used[j]=0
         for j in range (0, BLOCK_SIZE-1):
-            if(key[i].BombPermu[j] == 0):
-                k=j
+            if(key[i].BombPermu[h] == 0):
+                k=h
                 while True:
                     k =(k+1) % BLOCK_SIZE
                     if used[k] == 0:
                         break
-                key[i].BombPermu[j] = k
+                key[i].BombPermu[h] = k
                 l=k
                 while key[i].BombPermu[l] !=k:
                     l=key[i].BombPermu[l]
                 key[i].BombPermu[l]=0
-            used[j]=1
-            j=key[i].BombPermu[j]
+            used[h]=1
+            h=key[i].BombPermu[h]
         for ind in range (0, BLOCK_SIZE):
             if ind == BLOCK_SIZE -1:
-                j=0
+                h=0
             else:
-                j=ind+1
-            if key[i].BombPermu[ind]==j:
-                if(j == BLOCK_SIZE -1):
+                h=ind+1
+            if key[i].BombPermu[ind]==h:
+                if(h == BLOCK_SIZE -1):
                     k=0
                 else:
-                    k=j+1
+                    k=h+1
                 key[i].BombPermu[ind]=k
         
     return key
@@ -243,12 +245,19 @@ def makeKey(k):
     return intKey
     
 def main():
-    k = np.empty(32, dtype=np.int8)
-    for i in range(0, 32):
-        k[i] = 0
+    k = np.empty(16, dtype=np.int8)
+    for i in range(0, 16):
+        k[i] = i
+    pt=np.empty(BLOCK_SIZE, dtype=np.int8)
+    for i in range(0, BLOCK_SIZE):
+        pt[i] = i
     intKey=makeKey(k)
-    print(intKey.keyE)
-    print(intKey.keyD)
+    print("my text is ", pt)
+    cipherText=frogEncrypt(pt, intKey.keyE)
+    print("my encrypted text is ",cipherText)
+
+    plainText=frogDecrypt(cipherText, intKey.keyD)
+    print("my decrypted text is ",plainText)
 
 if __name__ == "__main__":
     main()
