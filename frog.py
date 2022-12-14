@@ -1,29 +1,9 @@
 #frog encryption decryption
 import numpy as np
 from enum import Enum
-
-BLOCK_SIZE = 10
-
-NUM_ITERATIONS = 8
-
-randomSeed=[
-    113, 21,232, 18,113, 92, 63,157,124,193,166,197,126, 56,229,229,
-			156,162, 54, 17,230, 89,189, 87,169,  0, 81,204,  8, 70,203,225,
-			160, 59,167,189,100,157, 84, 11,  7,130, 29, 51, 32, 45,135,237,
-			139, 33, 17,221, 24, 50, 89, 74, 21,205,191,242, 84, 53,  3,230,
-			231,118, 15, 15,107,  4, 21, 34,  3,156, 57, 66, 93,255,191,  3,
-			85,135,205,200,185,204, 52, 37, 35, 24, 68,185,201, 10,224,234,
-			7,120,201,115,216,103, 57,255, 93,110, 42,249, 68, 14, 29, 55,
-			128, 84, 37,152,221,137, 39, 11,252, 50,144, 35,178,190, 43,162,
-			103,249,109,  8,235, 33,158,111,252,205,169, 54, 10, 20,221,201,
-			178,224, 89,184,182, 65,201, 10, 60,  6,191,174, 79, 98, 26,160,
-			252, 51, 63, 79,  6,102,123,173, 49,  3,110,233, 90,158,228,210,
-			209,237, 30, 95, 28,179,204,220, 72,163, 77,166,192, 98,165, 25,
-			145,162, 91,212, 41,230,110,  6,107,187,127, 38, 82, 98, 30, 67,
-			225, 80,208,134, 60,250,153, 87,148, 60, 66,165, 72, 29,165, 82,
-			211,207,  0,177,206, 13,  6, 14, 92,248, 60,201,132, 95, 35,215,
-			118,177,121,180, 27, 83,131, 26, 39, 46, 12]
-
+import random
+import binascii
+from paramaters import *
 class ENCRYPTION(Enum):
     ENCRYPT = False
     DECRYPT = True
@@ -73,15 +53,17 @@ class FrogInternalKey:
     
     def getValue(self,index):
         return self.internalKey[index/FrogIterKey.size()].getValue(index%FrogIterKey.size())
+
+
 class Frog:
     def __init__(self):
         pass
     
     def frogEncrypt(self, plainText, key):
-        #Encrypt plainText using internalKey - (internal cycle) See B.1.1
-        for i in range (NUM_ITERATIONS):
-            for j in range (BLOCK_SIZE):
-                plainText[j] = np.bitwise_xor(plainText[j], key[i].xorBu[j]) 
+        #Encrypt plainText using internalKey - (internal cycle) See B.1.1  
+        for i in range (0, NUM_ITERATIONS):
+            for j in range (0, BLOCK_SIZE):
+                plainText[j] = plainText[j] ^ key[i].xorBu[j]
                 if plainText[j]<0:
                     plainText[j] = key[i].SubstPermu[plainText[j]+256]
                 else:
@@ -96,7 +78,7 @@ class Frog:
     def frogDecrypt(self, cipherText, key):
         for i in reversed(range (0, NUM_ITERATIONS)):
             for j in reversed(range (0, BLOCK_SIZE)):
-                cipherText[key[i]].BombPermu[j] ^= cipherText[j]
+                cipherText[key[i].BombPermu[j]] ^= cipherText[j]
                 if(j< BLOCK_SIZE -1):
                     cipherText[j+1] = cipherText[j+1] ^ cipherText[j]
                 else:
@@ -113,6 +95,7 @@ class Frog:
         key= [FrogIterKey() for i in range(NUM_ITERATIONS)]
         k=0
         l=0
+        h=0
         for i in range(0, NUM_ITERATIONS):
             key[i]=FrogIterKey()
             key[i].copyFrom(keyorigin[i])
@@ -125,29 +108,29 @@ class Frog:
             for j in range (0, BLOCK_SIZE):
                 used[j]=0
             for j in range (0, BLOCK_SIZE-1):
-                if(key[i].BombPermu[j] == 0):
-                    k=j
+                if(key[i].BombPermu[h] == 0):
+                    k=h
                     while True:
                         k =(k+1) % BLOCK_SIZE
                         if used[k] == 0:
                             break
-                    key[i].BombPermu[j] = k
+                    key[i].BombPermu[h] = k
                     l=k
                     while key[i].BombPermu[l] !=k:
                         l=key[i].BombPermu[l]
                     key[i].BombPermu[l]=0
-                used[j]=1
-                j=key[i].BombPermu[j]
+                used[h]=1
+                h=key[i].BombPermu[h]
             for ind in range (0, BLOCK_SIZE):
                 if ind == BLOCK_SIZE -1:
-                    j=0
+                    h=0
                 else:
-                    j=ind+1
-                if key[i].BombPermu[ind]==j:
-                    if(j == BLOCK_SIZE -1):
+                    h=ind+1
+                if key[i].BombPermu[ind]==h:
+                    if(h == BLOCK_SIZE -1):
                         k=0
                     else:
-                        k=j+1
+                        k=h+1
                     key[i].BombPermu[ind]=k
             
         return key
@@ -186,12 +169,12 @@ class Frog:
         position=0
 
         while True:
-            buffer = self.frogEncrypt(buffer, simpleKey)
-            size = sizeKey-position
-            if(size > BLOCK_SIZE):
+            buffer= self.frogEncrypt(buffer, simpleKey)
+            size =sizeKey-position
+            if(size> BLOCK_SIZE):
                 size=BLOCK_SIZE
-            for i in range (BLOCK_SIZE):
-                if buffer[i]<0:
+            for i in range (0, BLOCK_SIZE):
+                if(buffer[i]<0):
                     internalKey[(position+i)//FrogIterKey.size()].setValue((position+i)%FrogIterKey.size(), buffer[i]+256)
                 else:
                     internalKey[(position+i)//FrogIterKey.size()].setValue((position+i)%FrogIterKey.size(), buffer[i])
@@ -199,6 +182,8 @@ class Frog:
             if position == sizeKey:
                 break
         return internalKey
+
+
 
     def makePermutation(self, permu):
 
@@ -239,24 +224,19 @@ class Frog:
         intKey.keyE=self.makeInternalKey(ENCRYPTION.ENCRYPT, intKey.internalKey)
         intKey.keyD=self.makeInternalKey(ENCRYPTION.DECRYPT, intKey.internalKey)
         return intKey
-        
-def main():
-    frog = Frog()
-    k = np.empty(32, dtype=np.int32)
-    for i in range(0, 32):
-        k[i] = i
-    intKey=frog.makeKey(k)
-    print(intKey.keyE)
-    print(intKey.keyD)
-    userInput = "Matan".encode('utf-8').hex()
-    hex_arr = np.array([int(userInput[i:i+2], 16) for i in range(0, len(userInput), 2)])
+    
+# def main():
+#     k = np.empty(16, dtype=np.int8)
+#     for i in range(0, 16):
+#         k[i] = i
+#     pt=np.empty(BLOCK_SIZE, dtype=np.int8)
+#     for i in range(0, BLOCK_SIZE):
+#         pt[i] = i
+#     intKey=makeKey(k)
+#     print("my text is ", pt)
+#     cipherText=frogEncrypt(pt, intKey.keyE)
+#     print("my encrypted text is ",cipherText)
 
-    cipherText=frog.frogEncrypt(hex_arr,intKey.keyE)
-    print("cipher Text is",cipherText)
-    plainText=frog.frogDecrypt(cipherText,intKey.keyD)
-    print("decrypted Text is",plainText)
-
-
-if __name__ == "__main__":
-    main()
+#     plainText=frogDecrypt(cipherText, intKey.keyD)
+#     print("my decrypted text is ",plainText)
 
