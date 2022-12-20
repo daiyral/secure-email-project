@@ -6,6 +6,7 @@ from frog import Frog
 from elgamal import ElGamal
 import numpy as np
 import paramaters
+import os
 
 class Gui(QMainWindow):
 
@@ -34,9 +35,10 @@ class Gui(QMainWindow):
         self.frog = Frog()
         self.merkle_helman = MerkleHellman()
         self.el_gamal_signature = ElGamal()
-        # k = np.empty(16, dtype=np.int8)
-        # for i in range(0, 16):
-        #     k[i] = i
+        self.encrypted_msg = None
+        self.iv = np.empty(paramaters.BLOCK_SIZE, dtype=np.int8)
+        for i in range(paramaters.BLOCK_SIZE):
+            self.iv[i] = i
         self.intKey=self.frog.makeKey(self.merkle_helman.get_public_key())
         self.set_encrypt_section()
         self.set_decrypt_section()
@@ -80,23 +82,49 @@ class Gui(QMainWindow):
         msg = self.email_input.toPlainText()
         msg = bytes(msg, 'utf-8')
         arr = np.empty(len(msg), dtype=np.int8)
+        self.encrypted_msg = np.empty(len(msg), dtype=np.int8)
         i = 0
         for ch in msg:
             arr[i] = ch
             i += 1
         
-        print("my text is ", arr)
-        self.cipherText=self.frog.frogEncrypt(arr, self.intKey.keyE)
-        print("my encrypted text is ",self.cipherText)
-        self.email_encrypted.setText("cipherText")
+        c_i = self.frog.frogEncrypt(np.copy(self.iv), self.intKey.keyE) # first block is iv
+        # print("my text is ", arr)
+        i = 0
+        while i < len(arr):
+            if i + paramaters.BLOCK_SIZE > len(arr): 
+                for j in range(0, len(arr) - i):
+                    self.encrypted_msg[j+i] = arr[j+i] ^ c_i[j]
+                break
+            for j in range(0, paramaters.BLOCK_SIZE):
+                self.encrypted_msg[j+i] = arr[j+i] ^ c_i[j]
+            c_i = self.frog.frogEncrypt(np.copy(self.encrypted_msg[i:i+paramaters.BLOCK_SIZE]), self.intKey.keyE)
+            i += paramaters.BLOCK_SIZE
+        
+        # print("my encrypted text is ", self.encrypted_msg)
+        
+        # print("my encrypted text is ",self.encrypted_msg)
+        # self.email_encrypted.setText("cipherText")
         
     def decrypt_msg(self):
-        plainText=self.frog.frogDecrypt(self.cipherText, self.intKey.keyD)
+        pText =np.empty(len(self.encrypted_msg), dtype=np.int8)
+        c_i = self.frog.frogEncrypt(np.copy(self.iv), self.intKey.keyE) # first block is iv
+        i = 0
+        while i < len(pText):
+            if i + paramaters.BLOCK_SIZE > len(pText):
+                for j in range(0, len(pText) - i):
+                   pText[j+i] = self.encrypted_msg[j+i] ^ c_i[j]
+                break
+            for j in range(0, paramaters.BLOCK_SIZE):
+                pText[j+i] = self.encrypted_msg[j+i] ^ c_i[j]
+            c_i = self.frog.frogEncrypt(np.copy(self.encrypted_msg[i:i+paramaters.BLOCK_SIZE]), self.intKey.keyE)
+            i += paramaters.BLOCK_SIZE
+        # print("decrypted: ", pText)
         string = ""
-        for i in range(len(plainText)):
-            string += chr(plainText[i]).encode("utf-8").decode()
-        print("decrypted: ", plainText)
-        print("msg was = ", string)
+        for i in range(len(pText)):
+            string += chr(pText[i]).encode("utf-8").decode()
+        
+        self.email_decrypted.setText(string)
         
 if __name__ == "__main__":
     app = QApplication(sys.argv)
