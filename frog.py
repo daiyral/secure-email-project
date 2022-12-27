@@ -9,9 +9,9 @@ class ENCRYPTION(Enum):
     DECRYPT = True
 class FrogIterKey:
     def __init__(self):
-        self.xorBu =  np.empty(BLOCK_SIZE, dtype = np.int32)
-        self.SubstPermu = np.empty(256,dtype=np.int32)
-        self.BombPermu = np.empty(BLOCK_SIZE,dtype=np.int32)
+        self.xorBu =  [0]*BLOCK_SIZE
+        self.SubstPermu = [0]*256
+        self.BombPermu = [0]*BLOCK_SIZE
     
     def size():
         return BLOCK_SIZE*2+256
@@ -91,7 +91,8 @@ class Frog:
         return cipherText
 
     def makeInternalKey(self, decrypting, keyorigin):
-        used = np.empty(BLOCK_SIZE, dtype=np.int8)
+        # used = np.empty(BLOCK_SIZE, dtype=np.int8)
+        used = [0] * BLOCK_SIZE
         key= [FrogIterKey() for i in range(NUM_ITERATIONS)]
         k=0
         l=0
@@ -136,7 +137,8 @@ class Frog:
         return key
 
     def hashKey(self, binaryKey):
-        buffer = np.empty(BLOCK_SIZE, dtype=np.int8)
+        # buffer = np.empty(BLOCK_SIZE, dtype=np.int8)
+        buffer = [0] * BLOCK_SIZE
         simpleKey = [FrogIterKey() for i in range(NUM_ITERATIONS)]
         internalKey= [FrogIterKey() for i in range(NUM_ITERATIONS)]
         for i in range(0, NUM_ITERATIONS):
@@ -190,7 +192,8 @@ class Frog:
         #Receives an arbitarty byte arror of (lastElem -1) elements and
         #returns a permutation with values between 0 and lastElem.
         #Reference Text: section B.1.3  
-        use = np.empty(256, dtype=np.int8) # 256 length byte array
+        # use = np.empty(256, dtype=np.int8) # 256 length byte array
+        use = [0] * 256
         lastElem = len(permu) -1
         last = lastElem
         j=0
@@ -213,7 +216,8 @@ class Frog:
 
     def invertPermutation(self, origPermu):
         #Receives a permutation and returns its inverse
-        invPermu = np.empty(256, dtype=np.int8)
+        # invPermu = np.empty(256, dtype=np.int8)
+        invPermu = [0] * 256
         for i in range(0, len(origPermu)):
             invPermu[origPermu[i]] = i
         return invPermu
