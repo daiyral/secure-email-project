@@ -28,7 +28,7 @@ class MerkleHellman:
     
     def encrypt(self, msg):
         arr = [""]*len(msg)
-        self.encrypted_msg = np.empty(len(msg), dtype=np.int32)
+        encrypted_msg = [0]*len(msg)
         i = 0
         for ch in msg:
             arr[i] = format(ch, '16b')
@@ -36,13 +36,15 @@ class MerkleHellman:
         for i in range(len(arr)):
             for j in range(len(arr[i])):
                 if arr[i][j] == '1':
-                    self.encrypted_msg[i] += self.public_key[j]
-        return self.encrypted_msg
+                    encrypted_msg[i] += self.public_key[j]
+        return encrypted_msg
         
     def modular_inverse(self, a, m):
     # Calculate the modular inverse using the pow() function
-        inv = pow(a, m - 2, m)
-        return inv
+        for x in range(1, m):
+            if (((a % m) * (x % m)) % m == 1):
+                return x
+        return -1
     
             
     def find_index_greedy(self,weights, capacity):
@@ -61,25 +63,24 @@ class MerkleHellman:
     
     def decrypt(self, msg):
         r_tag = self.modular_inverse(self.private_key[2], self.private_key[1]) 
-        pText = np.empty(len(msg), dtype=np.int16)
+        pText = [0]*len(msg)
         for i in range(len(msg)):
-            pText[i] = 0
             msg[i] = msg[i] * r_tag % self.private_key[1]
             m_idx = self.find_index_greedy(self.private_key[0], msg[i])
             for j in range(len(m_idx)):
                 pText[i] += pow(2, 16 - m_idx[j])
-            
-            # 4,3,1 > 000011010
+        return pText
       
     def get_keys(self):
         temp_sum = 0
-        w = np.empty(MerkleHellman_block_size, dtype=np.int16)
-        b = np.empty(MerkleHellman_block_size, dtype=np.int16)
+        w = [0]*paramaters.BLOCK_SIZE
+        b = [0]*paramaters.BLOCK_SIZE
         for i in range(len(w)):
-            temp_sum += i + 1
+            temp_sum += temp_sum + i + 1
             w[i] = temp_sum
-        q = random.randint(temp_sum, pow(2, 16)-1)
-        r = random.randint(1, 255)
+        temp_sum += temp_sum
+        q = temp_sum + random.randint(1, 128)
+        r = random.randint(1, q)
         while math.gcd(r,q) != 1:
             r = random.randint(1, 255)
         for i in range(len(b)):

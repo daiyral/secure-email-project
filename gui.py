@@ -7,6 +7,7 @@ from frog import Frog
 from elgamal import ElGamal
 import numpy as np
 import paramaters
+import cfb_mode
 import os
 
 class Gui(QMainWindow):
@@ -37,18 +38,19 @@ class Gui(QMainWindow):
         self.merkle_helman = MerkleHellman()
         self.el_gamal_signature = ElGamal()
         self.encrypted_msg = None
-        self.iv = np.empty(paramaters.BLOCK_SIZE, dtype=np.int32)
+        self.iv = [0] * paramaters.BLOCK_SIZE
         for i in range(paramaters.BLOCK_SIZE):
             self.iv[i] = i
-        self.k = np.empty(paramaters.BLOCK_SIZE, dtype=np.int32)
+        self.k = [0]* paramaters.BLOCK_SIZE
         for i in range(paramaters.BLOCK_SIZE):
             self.k[i] = random.randint(0, 255)
         self.intKey=self.frog.makeKey(self.k)
-        self.intKey_enc = self.frog.makeKey(self.k).keyE
-        for i in range(len(self.intKey.keyE)):
-            self.intKey_enc[i].BombPermu = self.merkle_helman.encrypt(self.intKey.keyE[i].BombPermu)
-            self.intKey_enc[i].SubstPermu = self.merkle_helman.encrypt(self.intKey.keyE[i].SubstPermu)
-            self.intKey_enc[i].xorBu = self.merkle_helman.encrypt(self.intKey.keyE[i].xorBu)
+        self.k_enc = self.merkle_helman.encrypt(self.k)
+        # self.intKey_enc = self.frog.makeKey(self.k).keyE
+        # for i in range(len(self.intKey.keyE)):
+        #     self.intKey_enc[i].BombPermu = self.merkle_helman.encrypt(self.intKey.keyE[i].BombPermu)
+        #     self.intKey_enc[i].SubstPermu = self.merkle_helman.encrypt(self.intKey.keyE[i].SubstPermu)
+        #     self.intKey_enc[i].xorBu = self.merkle_helman.encrypt(self.intKey.keyE[i].xorBu)
         
         self.set_encrypt_section()
         self.set_decrypt_section()
@@ -91,54 +93,31 @@ class Gui(QMainWindow):
     def encrypt_msg(self):
         msg = self.email_input.toPlainText()
         msg = bytes(msg, 'utf-8')
-        arr = np.empty(len(msg), dtype=np.int8)
-        self.encrypted_msg = np.empty(len(msg), dtype=np.int8)
+        arr = [0]*len(msg)
+        self.encrypted_msg = [0]*len(msg)
         i = 0
         for ch in msg:
             arr[i] = ch
             i += 1
-        
-        c_i = self.frog.frogEncrypt(np.copy(self.iv), self.intKey.keyE) # first block is iv
-        # print("my text is ", arr)
-        i = 0
-        while i < len(arr):
-            if i + paramaters.BLOCK_SIZE > len(arr): 
-                for j in range(0, len(arr) - i):
-                    self.encrypted_msg[j+i] = arr[j+i] ^ c_i[j]
-                break
-            for j in range(0, paramaters.BLOCK_SIZE):
-                self.encrypted_msg[j+i] = arr[j+i] ^ c_i[j]
-            c_i = self.frog.frogEncrypt(np.copy(self.encrypted_msg[i:i+paramaters.BLOCK_SIZE]), self.intKey.keyE)
-            i += paramaters.BLOCK_SIZE
+        self.encrypted_msg = cfb_mode.encrypt(self.frog.frogEncrypt, self.iv, self.intKey.keyE, arr)
         
         print("my encrypted text is ", self.encrypted_msg)
-        
-        # print("my encrypted text is ",self.encrypted_msg)
-        # self.email_encrypted.setText("cipherText")
+        # string = ""
+        # for i in range(len(self.encrypted_msg)):
+        #     string += chr(self.encrypted_msg[i]).encode().decode()
+        # # print("my encrypted text is ",self.encrypted_msg)
+        # self.email_encrypted.setText(string)
         
     def decrypt_msg(self):
-        pText =np.empty(len(self.encrypted_msg), dtype=np.int8)
-        intKey_dec = self.frog.makeKey(self.k).keyE
-        for i in range(len(intKey_dec)):
-            intKey_dec[i].BombPermu = self.merkle_helman.decrypt(self.intKey_enc[i].BombPermu)
-            intKey_dec[i].SubstPermu = self.merkle_helman.decrypt(self.intKey_enc[i].SubstPermu)
-            intKey_dec[i].xorBu = self.merkle_helman.decrypt(self.intKey_enc[i].xorBu)
-        c_i = self.frog.frogEncrypt(np.copy(self.iv), self.intKey.keyE) # first block is iv
-        i = 0
-        while i < len(pText):
-            if i + paramaters.BLOCK_SIZE > len(pText):
-                for j in range(0, len(pText) - i):
-                   pText[j+i] = self.encrypted_msg[j+i] ^ c_i[j]
-                break
-            for j in range(0, paramaters.BLOCK_SIZE):
-                pText[j+i] = self.encrypted_msg[j+i] ^ c_i[j]
-            c_i = self.frog.frogEncrypt(np.copy(self.encrypted_msg[i:i+paramaters.BLOCK_SIZE]), self.intKey.keyE)
-            i += paramaters.BLOCK_SIZE
-        # print("decrypted: ", pText)
+        
+        k = self.merkle_helman.decrypt(self.k_enc)
+        for i in range(len(k)):
+            k[i] = int(k[i]/2)
+        intKey = self.frog.makeKey(k)
+        pText = cfb_mode.decrypt(self.frog.frogEncrypt, self.iv, intKey.keyE, self.encrypted_msg)
         string = ""
         for i in range(len(pText)):
             string += chr(pText[i]).encode("utf-8").decode()
-        
         self.email_decrypted.setText(string)
         
 if __name__ == "__main__":
