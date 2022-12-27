@@ -1,3 +1,4 @@
+import random
 import sys
 from PyQt6.QtWidgets import QApplication, QWidget, QPushButton, QToolTip, QMessageBox, QMainWindow, QVBoxLayout, QTextEdit, QLabel
 from PyQt6.QtGui import QFont
@@ -36,10 +37,19 @@ class Gui(QMainWindow):
         self.merkle_helman = MerkleHellman()
         self.el_gamal_signature = ElGamal()
         self.encrypted_msg = None
-        self.iv = np.empty(paramaters.BLOCK_SIZE, dtype=np.int8)
+        self.iv = np.empty(paramaters.BLOCK_SIZE, dtype=np.int32)
         for i in range(paramaters.BLOCK_SIZE):
             self.iv[i] = i
-        self.intKey=self.frog.makeKey(self.merkle_helman.get_public_key())
+        self.k = np.empty(paramaters.BLOCK_SIZE, dtype=np.int32)
+        for i in range(paramaters.BLOCK_SIZE):
+            self.k[i] = random.randint(0, 255)
+        self.intKey=self.frog.makeKey(self.k)
+        self.intKey_enc = self.frog.makeKey(self.k).keyE
+        for i in range(len(self.intKey.keyE)):
+            self.intKey_enc[i].BombPermu = self.merkle_helman.encrypt(self.intKey.keyE[i].BombPermu)
+            self.intKey_enc[i].SubstPermu = self.merkle_helman.encrypt(self.intKey.keyE[i].SubstPermu)
+            self.intKey_enc[i].xorBu = self.merkle_helman.encrypt(self.intKey.keyE[i].xorBu)
+        
         self.set_encrypt_section()
         self.set_decrypt_section()
         window = QWidget()
@@ -101,13 +111,18 @@ class Gui(QMainWindow):
             c_i = self.frog.frogEncrypt(np.copy(self.encrypted_msg[i:i+paramaters.BLOCK_SIZE]), self.intKey.keyE)
             i += paramaters.BLOCK_SIZE
         
-        # print("my encrypted text is ", self.encrypted_msg)
+        print("my encrypted text is ", self.encrypted_msg)
         
         # print("my encrypted text is ",self.encrypted_msg)
         # self.email_encrypted.setText("cipherText")
         
     def decrypt_msg(self):
         pText =np.empty(len(self.encrypted_msg), dtype=np.int8)
+        intKey_dec = self.frog.makeKey(self.k).keyE
+        for i in range(len(intKey_dec)):
+            intKey_dec[i].BombPermu = self.merkle_helman.decrypt(self.intKey_enc[i].BombPermu)
+            intKey_dec[i].SubstPermu = self.merkle_helman.decrypt(self.intKey_enc[i].SubstPermu)
+            intKey_dec[i].xorBu = self.merkle_helman.decrypt(self.intKey_enc[i].xorBu)
         c_i = self.frog.frogEncrypt(np.copy(self.iv), self.intKey.keyE) # first block is iv
         i = 0
         while i < len(pText):
